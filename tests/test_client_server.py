@@ -9,7 +9,6 @@ import zmq
 
 from tso_robotics_sockets.client import SocketClient
 from tso_robotics_sockets.messages.routes import (
-    ServerRoute,
     ServerStatus,
     TransportKey,
 )
