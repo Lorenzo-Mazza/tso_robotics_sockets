@@ -11,4 +11,7 @@ venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-*.so.audit/
+*.so
+.audit/
+.idea/
+uv.lock
