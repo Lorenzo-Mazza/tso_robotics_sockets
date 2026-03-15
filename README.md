@@ -1,5 +1,8 @@
 # tso-robotics-sockets
 
+[![Tests](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml/badge.svg)](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml)
+[![PyPI](https://img.shields.io/pypi/v/tso-robotics-sockets)](https://pypi.org/project/tso-robotics-sockets/)
+
 Lightweight ZMQ socket communication for robotics inference servers.
 
 Provides a `SocketClient` / `SocketServer` pair plus array compression utilities for sending images and numpy arrays over ZeroMQ.
@@ -7,7 +10,7 @@ Provides a `SocketClient` / `SocketServer` pair plus array compression utilities
 ## Installation
 
 ```bash
-pip install .
+pip install tso-robotics-sockets
 ```
 
 ## Quick start
