@@ -1,5 +1,6 @@
 """Tests for tso_robotics_sockets client-server integration."""
 import json
+import socket
 import threading
 import time
 
@@ -17,12 +18,9 @@ from tso_robotics_sockets.server import SocketServer
 
 def _find_free_port() -> int:
     """Find a free TCP port on localhost."""
-    sock = zmq.Context.instance().socket(zmq.REP)
-    sock.bind("tcp://127.0.0.1:0")
-    endpoint = sock.getsockopt_string(zmq.LAST_ENDPOINT)
-    port = int(endpoint.rsplit(":", 1)[1])
-    sock.close()
-    return port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 @pytest.fixture
@@ -255,6 +253,7 @@ class TestNonBlockingRoutes:
 
         client.request_socket.close()
         client_context.term()
+        server.executor.shutdown(wait=True)
         server.reply_socket.close()
         context.term()
 
