@@ -23,6 +23,13 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
+def _stop_server(server, thread):
+    """Signal the server to stop and wait for the thread to exit."""
+    server.stop()
+    thread.join(timeout=2.0)
+    server.reply_socket.close()
+
+
 @pytest.fixture
 def server_port() -> int:
     """Unique free port for each test."""
@@ -53,7 +60,7 @@ def echo_server(server_port: int):
     thread.start()
     time.sleep(0.05)
     yield server
-    server.reply_socket.close()
+    _stop_server(server, thread)
     context.term()
 
 
@@ -163,7 +170,7 @@ class TestServerRouteDispatch:
 
         client.request_socket.close()
         client_context.term()
-        server.reply_socket.close()
+        _stop_server(server, thread)
         context.term()
 
 
@@ -254,7 +261,7 @@ class TestNonBlockingRoutes:
         client.request_socket.close()
         client_context.term()
         server.executor.shutdown(wait=True)
-        server.reply_socket.close()
+        _stop_server(server, thread)
         context.term()
 
     def test_unknown_task_id_returns_error(self, server_port: int):
@@ -280,5 +287,93 @@ class TestNonBlockingRoutes:
 
         client.request_socket.close()
         client_context.term()
-        server.reply_socket.close()
+        _stop_server(server, thread)
+        context.term()
+
+
+@pytest.mark.integration
+class TestEndToEnd:
+
+    def test_blocking_sum_route(self, server_port: int):
+        context = zmq.Context()
+        server = SocketServer(
+            ip_address="127.0.0.1",
+            port=server_port,
+            context=context,
+        )
+
+        def sum_handler(message: dict) -> tuple[bool, dict]:
+            return True, {"sum": sum(message.get("numbers", []))}
+
+        server.add_route(route_name="sum", route_fn=sum_handler, blocking=True)
+
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        time.sleep(0.05)
+
+        client_context = zmq.Context()
+        client = SocketClient(
+            server_address="127.0.0.1",
+            server_port=server_port,
+            context=client_context,
+        )
+
+        response = client.send_request(
+            route_name="sum",
+            dict_data={"numbers": [1, 2, 3, 4, 5]},
+        )
+        assert response[TransportKey.STATUS.value] == ServerStatus.FINISHED.value
+        assert response["sum"] == 15
+
+        response = client.send_request(
+            route_name="sum",
+            dict_data={"numbers": []},
+        )
+        assert response["sum"] == 0
+
+        client.request_socket.close()
+        client_context.term()
+        _stop_server(server, thread)
+        context.term()
+
+    def test_non_blocking_sum_route(self, server_port: int):
+        context = zmq.Context()
+        server = SocketServer(
+            ip_address="127.0.0.1",
+            port=server_port,
+            context=context,
+        )
+
+        def sum_handler(message: dict) -> tuple[bool, dict]:
+            return True, {"sum": sum(message.get("numbers", []))}
+
+        server.add_route(route_name="sum", route_fn=sum_handler, blocking=False)
+
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+        time.sleep(0.05)
+
+        client_context = zmq.Context()
+        client = SocketClient(
+            server_address="127.0.0.1",
+            server_port=server_port,
+            context=client_context,
+        )
+
+        response = client.send_request(
+            route_name="sum",
+            dict_data={"numbers": [10, 20, 30]},
+        )
+        assert response[TransportKey.STATUS.value] == ServerStatus.PROCESSING.value
+        task_id = response[TransportKey.TASK_ID.value]
+
+        time.sleep(0.1)
+        status_response = client.check_task_status(task_id=task_id)
+        assert status_response[TransportKey.STATUS.value] == ServerStatus.FINISHED.value
+        assert status_response["sum"] == 60
+
+        client.request_socket.close()
+        client_context.term()
+        server.executor.shutdown(wait=True)
+        _stop_server(server, thread)
         context.term()

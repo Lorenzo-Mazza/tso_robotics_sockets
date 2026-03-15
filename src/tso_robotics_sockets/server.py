@@ -1,6 +1,7 @@
 """ZMQ socket server with blocking and non-blocking route handling."""
 
 import json
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
@@ -45,6 +46,7 @@ class SocketServer(ContextMixin):
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.pending_tasks: Dict[int, Any] = {}
         self.task_counter: int = 0
+        self._stop_event = threading.Event()
 
     def _create_response(
         self, route_fn: Callable, blocking: bool = True
@@ -179,15 +181,25 @@ class SocketServer(ContextMixin):
                 return self.create_error_response(f"{error}")
         return self.create_processing_response(task_id, {})
 
+    def stop(self) -> None:
+        """Signal the server to stop its main loop."""
+        self._stop_event.set()
+
     def run(self) -> None:
         """Start the server main loop.
 
         Listens for JSON messages, dispatches to registered routes,
-        and handles task status polling.
+        and handles task status polling.  Uses a poller so the loop
+        can be interrupted cleanly via :meth:`stop`.
         """
-        while True:
+        poller = zmq.Poller()
+        poller.register(self.reply_socket, zmq.POLLIN)
+        while not self._stop_event.is_set():
+            socks = dict(poller.poll(timeout=100))
+            if self.reply_socket not in socks:
+                continue
             try:
-                message = self.reply_socket.recv_string()
+                message = self.reply_socket.recv_string(zmq.NOBLOCK)
                 json_message = json.loads(message)
                 route_name = json_message[TransportKey.ROUTE_NAME.value]
                 if route_name == ServerRoute.TASK_STATUS.value:

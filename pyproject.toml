@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tso-robotics-sockets"
-version = "0.1.0"
+version = "0.1.1"
 description = "Lightweight ZMQ socket communication for robotics inference servers"
 readme = "README.md"
 license = "MIT"
