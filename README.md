@@ -2,6 +2,7 @@
 
 [![Tests](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml/badge.svg)](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/tso-robotics-sockets)](https://pypi.org/project/tso-robotics-sockets/)
+[![Python](https://img.shields.io/pypi/pyversions/tso-robotics-sockets)](https://pypi.org/project/tso-robotics-sockets/)
 
 Lightweight ZMQ socket communication for robotics inference servers.
 
