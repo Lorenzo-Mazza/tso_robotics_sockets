@@ -37,7 +37,7 @@ test = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Lorenzo-Mazza/tso_robotics_sockets"
+Repository = "https://github.com/nct-tso-robotics/tso_robotics_sockets"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tso_robotics_sockets"]

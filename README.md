@@ -1,6 +1,6 @@
 # tso-robotics-sockets
 
-[![Tests](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml/badge.svg)](https://github.com/Lorenzo-Mazza/tso_robotics_sockets/actions/workflows/test.yml)
+[![Tests](https://github.com/nct-tso-robotics/tso_robotics_sockets/actions/workflows/test.yml/badge.svg)](https://github.com/nct-tso-robotics/tso_robotics_sockets/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/tso-robotics-sockets)](https://pypi.org/project/tso-robotics-sockets/)
 [![Python](https://img.shields.io/pypi/pyversions/tso-robotics-sockets)](https://pypi.org/project/tso-robotics-sockets/)
 
