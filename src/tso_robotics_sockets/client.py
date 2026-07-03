@@ -20,6 +20,9 @@ class SocketClient(ContextMixin):
         server_port: Server TCP port.
         context: Shared zmq context; if ``None``, the process singleton
             is used.
+        request_timeout_seconds: Send/receive timeout for each request.
+            ``None`` (the default) blocks indefinitely, matching the
+            behavior of earlier releases.
     """
 
     def __init__(
@@ -27,12 +30,33 @@ class SocketClient(ContextMixin):
         server_address: str = "localhost",
         server_port: int = 5555,
         context: Optional[zmq.Context] = None,
+        request_timeout_seconds: Optional[float] = None,
     ):
         ContextMixin.__init__(self, context=context)
-        self.request_socket = self.context.socket(zmq.REQ)
-        self.request_socket.setsockopt(zmq.LINGER, 0)
-        connection_address = f"tcp://{server_address}:{server_port}"
-        self.request_socket.connect(connection_address)
+        self.request_timeout_seconds = request_timeout_seconds
+        self._connection_address = f"tcp://{server_address}:{server_port}"
+        self.request_socket = self._create_socket()
+
+    def _create_socket(self) -> zmq.Socket:
+        """Create and connect a REQ socket with the configured timeout."""
+        request_socket = self.context.socket(zmq.REQ)
+        request_socket.setsockopt(zmq.LINGER, 0)
+        if self.request_timeout_seconds is not None:
+            timeout_ms = int(self.request_timeout_seconds * 1000)
+            request_socket.setsockopt(zmq.RCVTIMEO, timeout_ms)
+            request_socket.setsockopt(zmq.SNDTIMEO, timeout_ms)
+        request_socket.connect(self._connection_address)
+        return request_socket
+
+    def _reset_socket(self) -> None:
+        """Replace the REQ socket after a failed request.
+
+        A REQ socket enforces strict send/receive alternation, so a request
+        that timed out leaves it permanently unusable; rebuilding the socket
+        lets callers retry.
+        """
+        self.request_socket.close()
+        self.request_socket = self._create_socket()
 
     def send_request(
         self,
@@ -47,12 +71,24 @@ class SocketClient(ContextMixin):
 
         Returns:
             Parsed JSON response from the server.
+
+        Raises:
+            TimeoutError: If the server does not respond within
+                ``request_timeout_seconds``. The socket is rebuilt so the
+                next request can be attempted.
         """
         if dict_data is None:
             dict_data = {}
         message = {TransportKey.ROUTE_NAME.value: route_name, **dict_data}
-        self.request_socket.send_string(json.dumps(message))
-        return json.loads(self.request_socket.recv_string())
+        try:
+            self.request_socket.send_string(json.dumps(message))
+            return json.loads(self.request_socket.recv_string())
+        except zmq.error.Again as error:
+            self._reset_socket()
+            raise TimeoutError(
+                f"No response from {self._connection_address} within "
+                f"{self.request_timeout_seconds}s for route '{route_name}'."
+            ) from error
 
     def check_task_status(self, task_id: int) -> dict:
         """Poll the status of a non-blocking server task.
