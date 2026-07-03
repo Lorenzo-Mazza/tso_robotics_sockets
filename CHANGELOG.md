@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-03
+
+### Added
+- `SocketClient(request_timeout_seconds=...)` — optional send/receive timeout
+  for requests. On timeout, `send_request` raises `TimeoutError` and rebuilds
+  the REQ socket so the next request can be attempted (REQ sockets are
+  otherwise unusable after a missed reply). The default (`None`) keeps the
+  previous fully blocking behavior, so existing callers are unaffected.
+- Python 3.14 support (CI matrix and classifiers).
+
 ## [0.1.1] - 2026-03-15
 
 ### Added

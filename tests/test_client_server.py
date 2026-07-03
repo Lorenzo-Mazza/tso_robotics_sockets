@@ -376,3 +376,56 @@ class TestEndToEnd:
         server.executor.shutdown(wait=True)
         _stop_server(server, thread)
         context.term()
+
+
+def test_request_timeout_raises_and_recovers(server_port: int):
+    """A silent server triggers TimeoutError; the client can retry after."""
+    context = zmq.Context()
+    # A bare REP socket that never replies simulates a hung server.
+    silent_socket = context.socket(zmq.REP)
+    silent_socket.bind(f"tcp://127.0.0.1:{server_port}")
+    client = SocketClient(
+        server_address="127.0.0.1",
+        server_port=server_port,
+        request_timeout_seconds=0.2,
+    )
+    try:
+        with pytest.raises(TimeoutError, match="No response from"):
+            client.send_request(route_name="echo", dict_data={"payload": "hello"})
+        # The REQ socket was rebuilt: a second request must be sendable and
+        # time out again instead of dying on strict REQ alternation.
+        with pytest.raises(TimeoutError, match="No response from"):
+            client.send_request(route_name="echo", dict_data={"payload": "again"})
+    finally:
+        client.request_socket.close()
+        silent_socket.close()
+        context.term()
+
+
+def test_no_timeout_preserves_blocking_default(echo_server, server_port: int):
+    """Without request_timeout_seconds, requests behave exactly as before."""
+    client = SocketClient(server_address="127.0.0.1", server_port=server_port)
+    try:
+        assert client.request_timeout_seconds is None
+        response = client.send_request(
+            route_name="echo", dict_data={"payload": "hello"}
+        )
+        assert response["echo"] == "hello"
+    finally:
+        client.request_socket.close()
+
+
+def test_timed_client_succeeds_against_live_server(echo_server, server_port: int):
+    """A configured timeout does not interfere with normal request flow."""
+    client = SocketClient(
+        server_address="127.0.0.1",
+        server_port=server_port,
+        request_timeout_seconds=5.0,
+    )
+    try:
+        response = client.send_request(
+            route_name="echo", dict_data={"payload": "hello"}
+        )
+        assert response["echo"] == "hello"
+    finally:
+        client.request_socket.close()
